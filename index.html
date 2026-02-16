@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Musosoup-style Task Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary:#4c7cff;
+  --success:#28a745;
+  --warning:#ffc107;
+  --danger:#dc3545;
+  --bg:#f4f5f7;
+  --sidebar-bg:#fff;
+  --panel-bg:#fff;
+  --table-bg:#fff;
+  --hover-bg:#f7f9ff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Inter',sans-serif;
+  display:flex;
+  height:100vh;
+  background:var(--bg);
+}
+
+/* SIDEBAR */
+.sidebar{
+  width:240px;
+  background:var(--sidebar-bg);
+  padding:20px;
+  border-right:1px solid #e5e5e5;
+  display:flex;
+  flex-direction:column;
+}
+.sidebar h2{
+  margin-bottom:20px;
+  font-weight:600;
+  color:#333;
+}
+.sidebar button{
+  width:100%;
+  margin-bottom:10px;
+  padding:12px;
+  border:none;
+  background:#f1f2f4;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:500;
+  transition:0.2s;
+}
+.sidebar button:hover{
+  background:#e4e5e9;
+}
+
+/* MAIN TABLE */
+.main{
+  flex:1;
+  padding:20px;
+  overflow:auto;
+}
+button.primary{
+  background:var(--primary);
+  color:white;
+  border:none;
+  padding:10px 15px;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:600;
+  margin-bottom:15px;
+}
+button.primary:hover{
+  background:#3b66e0;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  background:var(--table-bg);
+  border-radius:12px;
+  overflow:hidden;
+}
+th,td{
+  padding:12px;
+  border-bottom:1px solid #eee;
+  text-align:left;
+}
+th{
+  background:#fafafa;
+  cursor:pointer;
+  font-weight:600;
+}
+tr:hover{
+  background:var(--hover-bg);
+  transition:0.2s;
+}
+.overdue{
+  color:var(--danger);
+  font-weight:600;
+}
+.status-badge{
+  padding:3px 8px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:600;
+  color:white;
+  display:inline-block;
+}
+
+/* PANEL */
+.panel{
+  width:340px;
+  background:var(--panel-bg);
+  border-left:1px solid #e5e5e5;
+  padding:20px;
+}
+.panel h3{
+  margin-bottom:15px;
+  font-weight:600;
+}
+input,textarea{
+  width:100%;
+  margin-bottom:12px;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  font-size:14px;
+}
+textarea{height:130px;}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2>Tasks</h2>
+  <button onclick="setView('all')">All</button>
+  <button onclick="setView('overdue')">Overdue</button>
+  <button onclick="setView('completed')">Completed</button>
+  <hr style="margin:10px 0;">
+  <button onclick="exportData()">Export</button>
+  <input type="file" id="importFile" hidden onchange="importData(event)">
+  <button onclick="document.getElementById('importFile').click()">Import</button>
+</div>
+
+<div class="main">
+  <button class="primary" onclick="newTask()">+ New Task</button>
+  <table>
+    <thead>
+      <tr>
+        <th onclick="sortBy('title')">Title</th>
+        <th onclick="sortBy('due')">Due Date</th>
+        <th>Time Left</th>
+        <th onclick="sortBy('updated')">Last Activity</th>
+        <th>Status</th>
+        <th>Delete</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h3>Details</h3>
+  <input id="p_title" placeholder="Title">
+  <input id="p_due" type="date">
+  <textarea id="p_notes" placeholder="Notes"></textarea>
+  <textarea id="p_links" placeholder="Links (one per line)"></textarea>
+  <button class="primary" onclick="saveTask()">Save</button>
+  <button onclick="completeTask()">Complete</button>
+</div>
+
+<script>
+let tasks = JSON.parse(localStorage.getItem("tasks")||"[]");
+let selected = null;
+let view = 'all';
+let sort = 'due';
+
+function save(){ localStorage.setItem("tasks",JSON.stringify(tasks)); }
+
+function newTask(){
+  const t={ id:Date.now(), title:"New Task", due:new Date().toISOString().split('T')[0],
+           notes:"", links:[], status:"active", updated:Date.now() };
+  tasks.push(t);
+  save();
+  setView('all');
+  select(t.id);
+  render();
+}
+
+function deleteTask(id){
+  if(confirm("Delete this task?")){
+    tasks = tasks.filter(t=>t.id!==id);
+    if(selected && selected.id===id) selected=null;
+    save();
+    render();
+  }
+}
+
+function select(id){
+  selected = tasks.find(t=>t.id===id);
+  if(!selected) return;
+  p_title.value = selected.title;
+  p_due.value = selected.due;
+  p_notes.value = selected.notes;
+  p_links.value = selected.links.join("\n");
+}
+
+function saveTask(){
+  if(!selected) return;
+  selected.title=p_title.value;
+  selected.due=p_due.value;
+  selected.notes=p_notes.value;
+  selected.links=p_links.value.split("\n");
+  selected.updated=Date.now();
+  save();
+  render();
+}
+
+function completeTask(){
+  if(!selected) return;
+  selected.status="completed";
+  selected.updated=Date.now();
+  save();
+  render();
+}
+
+function overdue(t){ return t.status==="active" && t.due && new Date(t.due)<new Date(); }
+
+function daysRemaining(t){
+  if(!t.due) return "";
+  const diff=Math.ceil((new Date(t.due)-new Date())/(1000*60*60*24));
+  if(diff>1) return diff+" days";
+  if(diff===1) return "1 day";
+  if(diff===0) return "Today";
+  return "Overdue by "+Math.abs(diff)+" days";
+}
+
+function statusBadge(t){
+  if(t.status==="completed") return `<span class="status-badge" style="background:#28a745">Completed</span>`;
+  if(overdue(t)) return `<span class="status-badge" style="background:#dc3545">Overdue</span>`;
+  return `<span class="status-badge" style="background:#ffc107">Active</span>`;
+}
+
+function sortBy(s){ sort=s; render(); }
+function setView(v){ view=v; render(); }
+
+function render(){
+  let list = [...tasks];
+  if(view==="overdue") list=list.filter(overdue);
+  if(view==="completed") list=list.filter(t=>t.status==="completed");
+
+  list.sort((a,b)=>{
+    if(sort==="title") return a.title.localeCompare(b.title);
+    if(sort==="due") return new Date(a.due||0)-new Date(b.due||0);
+    if(sort==="updated") return b.updated - a.updated;
+  });
+
+  rows.innerHTML="";
+  list.forEach(t=>{
+    const tr=document.createElement("tr");
+    tr.style.cursor="pointer";
+    tr.onclick = ()=>select(t.id);
+    tr.innerHTML=`
+      <td>${t.title}</td>
+      <td class="${overdue(t)?'overdue':''}">${t.due||""}</td>
+      <td class="${overdue(t)?'overdue':''}">${daysRemaining(t)}</td>
+      <td>${new Date(t.updated).toLocaleString()}</td>
+      <td>${statusBadge(t)}</td>
+      <td><button onclick="event.stopPropagation();deleteTask(${t.id})">🗑</button></td>
+    `;
+    rows.appendChild(tr);
+  });
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(tasks,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="tasks.json";
+  a.click();
+}
+
+function importData(e){
+  const reader=new FileReader();
+  reader.onload=()=>{tasks=JSON.parse(reader.result); save(); render();}
+  reader.readAsText(e.target.files[0]);
+}
+
+render();
+</script>
+
+</body>
+</html>
