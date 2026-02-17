@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Musosoup-style Task Tracker</title>
+<title>Brinspot Task Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -132,9 +132,10 @@ textarea{height:130px;}
 
 <div class="sidebar">
   <h2>Tasks</h2>
-  <button onclick="setView('all')">All</button>
+  <button onclick="setView('active')">Active</button>
   <button onclick="setView('overdue')">Overdue</button>
   <button onclick="setView('completed')">Completed</button>
+  <button onclick="setView('all')">All</button>
   <hr style="margin:10px 0;">
   <button onclick="exportData()">Export</button>
   <input type="file" id="importFile" hidden onchange="importData(event)">
@@ -171,7 +172,7 @@ textarea{height:130px;}
 <script>
 let tasks = JSON.parse(localStorage.getItem("tasks")||"[]");
 let selected = null;
-let view = 'all';
+let view = 'active';
 let sort = 'due';
 
 function save(){ localStorage.setItem("tasks",JSON.stringify(tasks)); }
@@ -181,7 +182,6 @@ function newTask(){
            notes:"", links:[], status:"active", updated:Date.now() };
   tasks.push(t);
   save();
-  setView('all');
   select(t.id);
   render();
 }
@@ -224,6 +224,7 @@ function completeTask(){
 }
 
 function overdue(t){ return t.status==="active" && t.due && new Date(t.due)<new Date(); }
+function isActive(t){ return t.status==="active" && !overdue(t); }
 
 function daysRemaining(t){
   if(!t.due) return "";
@@ -245,6 +246,8 @@ function setView(v){ view=v; render(); }
 
 function render(){
   let list = [...tasks];
+
+  if(view==="active") list=list.filter(isActive);
   if(view==="overdue") list=list.filter(overdue);
   if(view==="completed") list=list.filter(t=>t.status==="completed");
 
